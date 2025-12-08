@@ -1,0 +1,50 @@
+# Dataset main configurations
+dataset: Afairy
+panel: Afairy
+cohort-columns:
+  - cohort
+targets: config/af-vampir.bed
+metadata: config/af-vampir-samples2.tsv
+
+
+platform: nanopore
+from-bcl: False
+# Directory of Illumina Miseq Run, can be empty 
+illumina-dir: []
+illumina-demultiplexed: False
+
+
+# Genome fasta reference files
+reference-fasta: resources/reference/VectorBase-68_AfunestusAfunGA1_Genome.fasta
+reference-gff3: resources/reference/VectorBase-68_AfunestusAfunGA1.gff
+reference-snpeffdb: mysnpeffdb
+custom-snpeffdb: True
+
+# Specify whether to run quality-control analyses
+quality-control:
+  sample-total-reads-threshold: 250
+  amplicon-total-reads-threshold: 1000
+
+  coverage: True
+  stats: True
+  multiqc: True
+
+# Specify whether to run generic analyses
+analysis:  
+  sample-map: False # needs lat and longs
+  population-structure: True
+  genetic-diversity: True
+  allele-frequencies: True
+
+# Specify whether to build jupyter results book
+build-jupyter-book: True
+
+
+### will need to determin if i can set sample threshold to a figure close to 100 and amplicon threshold to a figure close to 500
+
+
+### Adding input file type option ## picked from workshop
+#from-bcl: False
+
+fastq:
+  auto: True

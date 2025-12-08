@@ -1,0 +1,14 @@
+name: AmpSeeker-nanopore
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  # Core tools
+  - python=3.9            # Clair3 requires <=3.9 ## added cuz clair3 was failing 
+  - numpy<2               # added to Prevent Clair3 / tensorflow crashes
+  # Nanopore-specific tools
+  - minimap2
+  - fastp
+  # Variant calling
+  - clair3
