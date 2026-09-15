@@ -44,21 +44,38 @@ def vcf_to_snp_dataframe(vcf_path, metadata, platform, filter_missing=None):
     
     return snp_df, geno
 
-def calculate_frequencies_cohort(snp_df, metadata, geno, cohort_col, af_filter, missense_filter):
+def calculate_frequencies_cohort(snp_df, metadata, geno, cohort_col, af_filter, missense_filter, df_bed=None):
+    """Calculate cohort-specific alternate allele frequencies.
+    Parameters
+    ----------
+    snp_df : pandas.DataFrame
+        SNP dataframe produced by :func:`vcf_to_snp_dataframe`.
+    metadata : pandas.DataFrame
+        Sample metadata aligned to `geno`.
+    geno : allel.GenotypeArray
+        Genotype array used to derive allele counts.
+    cohort_col : str
+        Metadata column defining cohorts.
+    af_filter : bool
+        Whether to retain only variants with frequency above 0.05 in at least
+        one cohort.
+    missense_filter : bool
+        Whether to retain only missense variants.
+    Returns
+    -------
+    pandas.DataFrame
+        SNP annotation and frequency table indexed by formatted variant label.
+    """
     np.seterr(all="ignore")
-    
     df = snp_df.copy()
-    
     # get indices of each cohort
     coh_dict = {}
     cohs = metadata[cohort_col].unique()
     cohs = cohs[~pd.isnull(cohs)]
     for coh in cohs:
         coh_dict[coh] = np.where(metadata[cohort_col] == coh)[0]
-    
     # get allele counts for each population
     ac = geno.count_alleles_subpops(coh_dict, max_allele=3)
-    
     for coh in cohs:
         total_counts = []
         alt_counts = []
@@ -67,44 +84,62 @@ def calculate_frequencies_cohort(snp_df, metadata, geno, cohort_col, af_filter, 
             alt_idx = row['alt_index']
             total_counts.append(ac[coh][var_idx,:].sum())
             alt_counts.append(ac[coh][var_idx, alt_idx])
-
         df.loc[:, f'count_{coh}'] = np.array(alt_counts)
         df.loc[:, f'frq_{coh}'] = np.round(np.array(alt_counts)/np.array(total_counts), 3)
-    
     freq_df = df.set_index('label').filter(like='frq')
-    
     ann_df = snp_df.ann.str.split("|", expand=True).iloc[:, :11].drop(columns=[0,7,8])
     ann_df.columns = ['type', 'effect', 'gene', 'geneID', 'modifier', 'transcript', 'base_change', 'aa_change']
     snp_df = pd.concat([snp_df[['contig', 'pos', 'ref', 'alt']], ann_df], axis=1)
     snp_freq_df = pd.concat([snp_df, freq_df.reset_index()], axis=1)
-
+    # merge amplicon_id from BED file using position to avoid duplicating SNPs
+    snp_freq_df = snp_freq_df.merge(
+        df_bed[['gene_id', 'amplicon_id', 'start', 'end']],
+        left_on='gene',
+        right_on='gene_id',
+        how='left'
+    )
+    snp_freq_df = snp_freq_df[
+        (snp_freq_df['pos'] >= snp_freq_df['start']) &
+        (snp_freq_df['pos'] <= snp_freq_df['end'])
+    ]
+    snp_freq_df = snp_freq_df.drop(columns=['gene_id', 'start', 'end'])
     snp_freq_df = snp_freq_df.assign(label=
-                  lambda x: x.contig + " | " + x.gene + " | " + x.pos.astype(str) + " | " + x.aa_change.str.replace("p.", "") + " | " + x.alt.fillna(" ")
-                 )
-    
+        lambda x: x.amplicon_id.fillna('NA') + " | " + x.contig + " | " + x.gene + " | " + x.pos.astype(str) + " | " + x.aa_change.str.replace("p.", "") + " | " + x.alt.fillna(" ")
+    )
     if af_filter:
         af_pass = (snp_freq_df.filter(like='frq') > 0.05).any(axis=1)
         snp_freq_df = snp_freq_df[af_pass]
-    
     if missense_filter:
         snp_freq_df = snp_freq_df.query("type == 'missense_variant'")
-    
     return snp_freq_df.set_index('label')
 
-def plot_allele_frequencies(df, cohort_col, colscale="Reds"):
-        
-    fig = px.imshow(
-            img=df,
-            zmin=0,
-            zmax=1,
-            width=np.max([800, df.shape[1] * 100]),
-            height=200 + (df.shape[0] * 18),
-            text_auto=True,
-            aspect=1,
-            color_continuous_scale=colscale,
-            title=f"Allele frequencies | by {cohort_col}",
-        template='simple_white'
-        )
-    fig.update(layout_coloraxis_showscale=False)
 
+def plot_allele_frequencies(df, cohort_col, colscale="Reds"):
+    """Plot a heatmap of alternate allele frequencies.
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Matrix-like dataframe of allele frequencies.
+    cohort_col : str
+        Cohort label used in the plot title.
+    colscale : str, default="Reds"
+        Plotly continuous color scale name.
+    Returns
+    -------
+    plotly.graph_objects.Figure
+        Heatmap figure of allele frequencies by cohort.
+    """
+    fig = px.imshow(
+        img=df,
+        zmin=0,
+        zmax=1,
+        width=np.max([800, df.shape[1] * 100]),
+        height=200 + (df.shape[0] * 18),
+        text_auto=True,
+        aspect=1,
+        color_continuous_scale=colscale,
+        title=f"Allele frequencies | by {cohort_col}",
+        template='simple_white'
+    )
+    fig.update(layout_coloraxis_showscale=False)
     return fig

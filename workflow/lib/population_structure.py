@@ -11,6 +11,7 @@ from scipy.spatial.distance import squareform
 import shared
 
 def plot_pca(pca_df, colour_column, cohort_columns, dataset,  x='PC1',y='PC2',z='PC3', color_mapping=None, height=500, width=750):
+      
     fig= px.scatter_3d(
         pca_df, 
         x=x, 
@@ -100,3 +101,28 @@ def run_njt_analysis(geno, metadata, cohort_cols, cohort_col, color_mapping, wkd
         figures.append(fig)
 
     return figures
+
+
+## adding somthing to see if i can generate 2d plots
+def plot_pca2d(pca_df, colour_column, cohort_columns, dataset,
+               x='PC1', y='PC2', z='PC3', color_mapping=None, height=500, width=750):
+    pcs = [x, y, z]
+    figs = []
+
+    for pc_a, pc_b in zip(pcs, pcs[1:]):
+        fig = px.scatter(
+            pca_df,
+            x=pc_a,
+            y=pc_b,
+            title=f"PCA {dataset} | {pc_a} vs {pc_b} coloured by {colour_column}",
+            color=colour_column,
+            hover_data=cohort_columns + ['sample_id'],
+            color_discrete_map=color_mapping[colour_column],
+            template='simple_white',
+            height=height,
+            width=width
+        )
+        fig.update_traces(marker=dict(size=4))
+        figs.append(fig)
+
+    return figs

@@ -3,7 +3,7 @@ import numpy as np
 import allel
 import re
 
-def load_bed(bed_path: str, expected_cols = ['contig', 'start', 'end', 'amplicon_id', 'mutation', 'ref', 'alt']) -> pd.DataFrame:
+def load_bed(bed_path: str, expected_cols = ['contig', 'start', 'end', 'amplicon_id', 'mutation', 'ref', 'alt', 'gene_id']) -> pd.DataFrame:
     """
     Reads a BED-like file with optional REF and ALT columns.
     Returns a dataframe with consistent column naming.
