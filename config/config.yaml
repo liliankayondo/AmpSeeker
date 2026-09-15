@@ -1,6 +1,11 @@
 # Dataset main configurations
 dataset: Afairy
 panel: Afairy
+# Sample ploidy. Use 1 for haploid organisms, 2 for diploid (default),
+# or higher integers for polyploids (tetraploid = 4, etc.).
+# Polyploid (>2) is supported for Illumina only — Nanopore is restricted
+# to ploidy 1 or 2 because clair3 has no polyploid mode.
+ploidy: 2
 cohort-columns:
   - cohort
 targets: config/af-vampir.bed
@@ -24,8 +29,7 @@ custom-snpeffdb: True
 
 # Specify whether to run quality-control analyses
 quality-control:
-  sample-total-reads-threshold: 250
-  amplicon-total-reads-threshold: 1000
+  sample-min-mean-target-coverage: 5
   fastp: True
   coverage: True
   stats: True
