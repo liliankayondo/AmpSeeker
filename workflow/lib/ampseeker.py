@@ -17,6 +17,7 @@ from allele_frequencies import (
 
 from population_structure import (
     plot_pca,
+    plot_pca2d,
     compute_njt_inputs,
     run_njt_analysis,
 )

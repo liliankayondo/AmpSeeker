@@ -235,7 +235,16 @@ def pca(geno, metadata, n_components = 3, query=None, missing_threshold=0.05):
     # are identical and therefore contribute no information to PCA.
     loc_var = np.any(gn_alt != gn_alt[:, 0, np.newaxis], axis=1)
     gn_var = np.compress(loc_var, gn_alt, axis=0)
-    
+
+    if gn_var.shape[0] < n_components:
+        raise ValueError(
+            f"Only {gn_var.shape[0]} segregating, non-missing, variant sites remain "
+            f"after filtering (need at least {n_components} to compute {n_components} "
+            "PCA components). This is expected for a cohort with little genetic "
+            "diversity or high missingness at this panel's markers -- catch this "
+            "ValueError and skip PCA for that cohort rather than treating it as a bug."
+        )
+
     coords, model = allel.pca(gn_var, n_components=n_components)
 
     # flip axes back so PC1 is same orientation in each window 

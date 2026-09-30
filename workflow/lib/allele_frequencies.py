@@ -63,7 +63,7 @@ def vcf_to_snp_dataframe(vcf_path, metadata, platform, filter_missing=None):
     
     return snp_df, geno
 
-def calculate_frequencies_cohort(snp_df, metadata, geno, cohort_col, af_filter, missense_filter, df_bed=None):
+def calculate_frequencies_cohort(snp_df, metadata, geno, cohort_col, af_filter, missense_filter, df_bed=None, require_exact_position=True):
     """Calculate cohort-specific alternate allele frequencies.
 
     Parameters
@@ -83,7 +83,17 @@ def calculate_frequencies_cohort(snp_df, metadata, geno, cohort_col, af_filter, 
         Whether to retain only missense variants.
     df_bed : pandas.DataFrame, optional
         BED-derived dataframe used to attach `amplicon_id` to each variant by
-        genomic position.
+        genomic position (or by gene, see `require_exact_position`).
+    require_exact_position : bool, default=True
+        If True (the targeted-marker use case), only keep variants whose
+        position falls exactly within the matching BED row's start-end
+        window -- appropriate when `snp_df` only contains calls at known
+        marker sites anyway. If False (the gene-level discovery use case,
+        e.g. whole-amplicon variant calling with `missense_filter=True`),
+        keep any variant whose gene matches a gene present in the BED panel
+        regardless of exact position, so a novel variant elsewhere in a
+        panel gene isn't silently dropped for not sitting on the exact
+        designed marker base pair.
 
     Returns
     -------
@@ -116,16 +126,29 @@ def calculate_frequencies_cohort(snp_df, metadata, geno, cohort_col, af_filter, 
     snp_df = pd.concat([snp_df[['contig', 'pos', 'ref', 'alt']], ann_df], axis=1)
     snp_freq_df = pd.concat([snp_df, freq_df.reset_index()], axis=1)
     # merge amplicon_id from BED file using position to avoid duplicating SNPs
+    bed_lookup = df_bed[['gene_id', 'amplicon_id', 'start', 'end']]
+    if not require_exact_position:
+        # Several BED rows can share the same gene_id (e.g. multiple markers
+        # in the same gene). Matching by gene alone would otherwise duplicate
+        # each variant once per matching BED row, so collapse to one row per
+        # gene first.
+        bed_lookup = bed_lookup.dropna(subset=['gene_id']).drop_duplicates(subset=['gene_id'], keep='first')
+
     snp_freq_df = snp_freq_df.merge(
-        df_bed[['gene_id', 'amplicon_id', 'start', 'end']],
+        bed_lookup,
         left_on='gene',
         right_on='gene_id',
         how='left'
     )
-    snp_freq_df = snp_freq_df[
-        (snp_freq_df['pos'] >= snp_freq_df['start']) &
-        (snp_freq_df['pos'] <= snp_freq_df['end'])
-    ]
+    if require_exact_position:
+        snp_freq_df = snp_freq_df[
+            (snp_freq_df['pos'] >= snp_freq_df['start']) &
+            (snp_freq_df['pos'] <= snp_freq_df['end'])
+        ]
+    else:
+        # keep any variant whose gene is present in the panel, regardless of
+        # exact position within that gene
+        snp_freq_df = snp_freq_df[snp_freq_df['gene_id'].notna()]
     snp_freq_df = snp_freq_df.drop(columns=['gene_id', 'start', 'end'])
     snp_freq_df = snp_freq_df.assign(label=
         lambda x: x.amplicon_id.fillna('NA') + " | " + x.contig + " | " + x.gene + " | " + x.pos.astype(str) + " | " + x.aa_change.str.replace("p.", "") + " | " + x.alt.fillna(" ")

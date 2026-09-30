@@ -10,4 +10,7 @@ dependencies:
   - minimap2
   - fastplong
   # Variant calling
-  - clair3
+  # pinned to 1.2.0 (TensorFlow backend) to match the TF-format models in
+  # resources/models/ -- newer builds moved to PyTorch and expect .pt checkpoints,
+  # which these models don't have (see logs/clair3/amplicons/*.log for the failure)
+  - clair3=1.2.0
